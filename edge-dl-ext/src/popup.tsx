@@ -10,7 +10,7 @@ function IndexPopup() {
       }}>
       <h2>
         Welcome to your{" "}
-        <a className="text-red-500" href="https://www.plasmo.com" target="_blank">
+        <a className="text-red-500 text-2xl" href="https://www.plasmo.com" target="_blank">
           Plasmo
         </a>{" "}
         Extension!
