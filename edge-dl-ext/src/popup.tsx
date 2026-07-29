@@ -1,5 +1,5 @@
 import { useState } from "react"
-
+import "./style.css"
 function IndexPopup() {
   const [data, setData] = useState("")
 
@@ -10,7 +10,7 @@ function IndexPopup() {
       }}>
       <h2>
         Welcome to your{" "}
-        <a href="https://www.plasmo.com" target="_blank">
+        <a className="text-red-500" href="https://www.plasmo.com" target="_blank">
           Plasmo
         </a>{" "}
         Extension!
