@@ -90,9 +90,22 @@ async function runYtDlp(url) {
     "--skip-download",
     "--no-warnings",
     "--no-check-certificates",
-    "--extractor-args", "youtube:player_client=tv_embedded,mweb,ios",
+    "--extractor-args", "youtube:player_client=tv_embedded,android_vr,web_creator,mweb",
     url
   ];
+
+  const cookiesPath = path.join(__dirname, "cookies.txt");
+  if (fs.existsSync(cookiesPath)) {
+    args.push("--cookies", cookiesPath);
+  } else if (process.env.YOUTUBE_COOKIES) {
+    const tmpCookies = path.join(__dirname, "yt_cookies.txt");
+    try {
+      const rawEnv = process.env.YOUTUBE_COOKIES.trim();
+      const cookieData = rawEnv.startsWith("#") ? rawEnv : Buffer.from(rawEnv, "base64").toString("utf-8");
+      fs.writeFileSync(tmpCookies, cookieData);
+      args.push("--cookies", tmpCookies);
+    } catch (_) {}
+  }
 
   return new Promise((resolve, reject) => {
     execFile(executable, args, { maxBuffer: 1024 * 1024 * 16 }, (error, stdout, stderr) => {
