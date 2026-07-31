@@ -202,6 +202,89 @@ async function extractFromPipedApi(url) {
   return null;
 }
 
+async function extractFromInvidiousApi(url) {
+  const videoId = extractYouTubeId(url);
+  if (!videoId) return null;
+
+  const INVIDIOUS_INSTANCES = [
+    "https://inv.tux.pizza",
+    "https://invidious.nerdvpn.de",
+    "https://invidious.drgns.space",
+    "https://vid.puffyan.us"
+  ];
+
+  for (const instance of INVIDIOUS_INSTANCES) {
+    try {
+      const resp = await fetch(`${instance}/api/v1/videos/${videoId}`);
+      if (!resp.ok) continue;
+      const data = await resp.json();
+
+      const allFormats = [...(data.formatStreams || []), ...(data.adaptiveFormats || [])];
+      if (allFormats.length === 0) continue;
+
+      const audioStreams = [];
+      const videoStreams = [];
+
+      for (const f of allFormats) {
+        if (!f.url) continue;
+
+        const isAudio = f.type?.includes("audio") || (f.encoding && f.encoding.includes("audio"));
+        const isVideo = f.type?.includes("video") || (f.qualityLabel && f.qualityLabel.includes("p"));
+
+        if (isAudio && !isVideo) {
+          audioStreams.push({
+            formatId: String(f.itag || "audio"),
+            url: f.url,
+            ext: f.container || "m4a",
+            acodec: f.type || "audio",
+            abr: f.bitrate ? Math.round(parseInt(f.bitrate, 10) / 1000) : 128,
+            filesize: f.size ? parseInt(f.size, 10) : null,
+            formatNote: f.quality || "audio"
+          });
+        } else if (isVideo) {
+          const hasAudio = !f.type?.includes("video/") || (f.audioQuality && f.audioQuality !== "none");
+          videoStreams.push({
+            formatId: String(f.itag || "video"),
+            url: f.url,
+            ext: f.container || "mp4",
+            resolution: f.qualityLabel || (f.height ? `${f.height}p` : "video"),
+            width: f.width || 0,
+            height: f.height || 0,
+            fps: f.fps || 30,
+            vcodec: f.type || "video",
+            acodec: hasAudio ? "audio" : "none",
+            hasAudio,
+            filesize: f.size ? parseInt(f.size, 10) : null,
+            formatNote: f.qualityLabel || null
+          });
+        }
+      }
+
+      videoStreams.sort((a, b) => (b.height || 0) - (a.height || 0));
+      audioStreams.sort((a, b) => (b.abr || 0) - (a.abr || 0));
+
+      if (videoStreams.length > 0 || audioStreams.length > 0) {
+        const thumbs = data.videoThumbnails || [];
+        const thumbnail = thumbs.length > 0 ? thumbs[0].url : undefined;
+
+        return {
+          id: videoId,
+          title: data.title || "YouTube Video",
+          description: data.description || "",
+          thumbnail,
+          duration: data.lengthSeconds || 0,
+          uploader: data.author || null,
+          webpageUrl: url,
+          extractor: "invidious:api",
+          audioStreams,
+          videoStreams
+        };
+      }
+    } catch (_) {}
+  }
+  return null;
+}
+
 async function extractMetadata(url) {
   // 1. Try yt-dlp first
   try {
@@ -256,17 +339,24 @@ async function extractMetadata(url) {
       };
     }
   } catch (ytDlpErr) {
-    console.warn(`[EdgeDL Server] yt-dlp extraction failed: ${ytDlpErr.message}. Attempting Piped API fallback...`);
+    console.warn(`[EdgeDL Server] yt-dlp extraction failed: ${ytDlpErr.message}. Trying multi-api fallbacks...`);
   }
 
-  // 2. Fallback to Piped API (Bypasses YouTube bot blocks on Render datacenter IPs)
+  // 2. Fallback to Piped API
   const pipedData = await extractFromPipedApi(url);
   if (pipedData) {
     console.log(`[EdgeDL Server] Successfully extracted metadata via Piped API fallback for ${url}`);
     return pipedData;
   }
 
-  throw new Error("Unable to extract video streams from both yt-dlp and fallback service.");
+  // 3. Fallback to Invidious API
+  const invidiousData = await extractFromInvidiousApi(url);
+  if (invidiousData) {
+    console.log(`[EdgeDL Server] Successfully extracted metadata via Invidious API fallback for ${url}`);
+    return invidiousData;
+  }
+
+  throw new Error("Unable to extract video streams from both yt-dlp and fallback services.");
 }
 
 app.get("/", (req, res) => {
