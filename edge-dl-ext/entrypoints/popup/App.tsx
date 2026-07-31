@@ -31,8 +31,7 @@ interface MediaData {
   isFromCache?: boolean
 }
 
-const SERVER_URL = "https://edgedl.onrender.com"
-// const SERVER_URL = "http://localhost:5000"
+const SERVER_URL = "http://localhost:5000"
 
 const getCacheKey = (rawUrl: string) => "edgedl_cache_" + encodeURIComponent(rawUrl.trim())
 
@@ -285,25 +284,26 @@ function App() {
     try {
       let data: MediaData | null = null
 
-      // For YouTube URLs, run Client-Side Innertube extraction first (bypasses cloud IP bot blocks)
-      if (trimmed.includes("youtube.com") || trimmed.includes("youtu.be")) {
-        console.log("[EdgeDL] Running client-side YouTube extraction...")
+      // 1. Query Local Electron Server (http://localhost:5000) first for maximum quality & cookie auth
+      try {
+        console.log("[EdgeDL] Fetching stream metadata from local server at " + SERVER_URL)
+        const response = await fetch(`${SERVER_URL}/api/extract?url=${encodeURIComponent(trimmed)}`)
+        const json = await response.json()
+        if (json.success && json.data) {
+          data = json.data
+        }
+      } catch (_) {
+        console.warn("[EdgeDL] Local desktop server offline or unavailable at " + SERVER_URL)
+      }
+
+      // 2. Fall back to Client-Side Browser Innertube extraction if local server is offline/unavailable
+      if (!data && (trimmed.includes("youtube.com") || trimmed.includes("youtu.be"))) {
+        console.log("[EdgeDL] Running client-side browser Innertube extraction fallback...")
         data = await extractClientSideYouTube(trimmed)
       }
 
-      // If client-side failed or not YouTube, try backend server
       if (!data) {
-        try {
-          const response = await fetch(`${SERVER_URL}/api/extract?url=${encodeURIComponent(trimmed)}`)
-          const json = await response.json()
-          if (json.success && json.data) {
-            data = json.data
-          }
-        } catch (_) {}
-      }
-
-      if (!data) {
-        throw new Error("Failed to extract video streams. Please check the URL.")
+        throw new Error("Unable to extract video streams. Please make sure the EdgeDL Desktop App is running.")
       }
 
       setMediaData({ ...data, isFromCache: false })

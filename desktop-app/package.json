@@ -1,0 +1,45 @@
+{
+  "name": "edgedl-companion",
+  "version": "1.0.0",
+  "description": "EdgeDL High-Speed Download Companion Desktop App",
+  "author": "EdgeDL",
+  "license": "ISC",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win nsis",
+    "build:portable": "electron-builder --win portable"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.edgedl.companion",
+    "productName": "EdgeDL Companion",
+    "publish": null,
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "files": [
+      "**/*"
+    ]
+  }
+}
