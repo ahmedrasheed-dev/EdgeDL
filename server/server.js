@@ -20,9 +20,6 @@ const IS_WINDOWS = process.platform === "win32";
 const BIN_NAME = IS_WINDOWS ? "yt-dlp.exe" : "yt-dlp";
 const BIN_PATH = process.env.YT_DLP_PATH || path.join(BIN_DIR, BIN_NAME);
 
-
-// Download yt-dlp binary if not present locally or in PATH
-
 async function ensureYtDlpBinary() {
   if (fs.existsSync(BIN_PATH)) {
     return BIN_PATH;
@@ -36,7 +33,7 @@ async function ensureYtDlpBinary() {
     ? "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
     : "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
 
-  console.log(`Downloading yt-dlp binary from ${downloadUrl}...`);
+  console.log(`Downloading latest yt-dlp binary from ${downloadUrl}...`);
 
   return new Promise((resolve, reject) => {
     const downloadFile = (url) => {
@@ -75,9 +72,6 @@ async function ensureYtDlpBinary() {
   });
 }
 
-
-//  Runs yt-dlp --dump-json on the target URL
-
 async function runYtDlp(url) {
   let executable = BIN_PATH;
 
@@ -93,9 +87,7 @@ async function runYtDlp(url) {
   const args = [
     "--dump-json",
     "--no-warnings",
-    "--no-call-home",
     "--no-check-certificates",
-    "--prefer-free-formats",
     url
   ];
 
@@ -114,9 +106,6 @@ async function runYtDlp(url) {
   });
 }
 
-
-//  Extracts formatted audio and video stream URLs
-
 async function extractMetadata(url) {
   const rawData = await runYtDlp(url);
   const formats = rawData.formats || [];
@@ -128,10 +117,12 @@ async function extractMetadata(url) {
       url: f.url,
       ext: f.ext,
       acodec: f.acodec,
-      abr: f.abr || null,
+      abr: f.abr || 0,
       filesize: f.filesize || f.filesize_approx || null,
-      formatNote: f.format_note || null
-    }));
+      formatNote: f.format_note || null,
+      httpHeaders: f.http_headers || null
+    }))
+    .sort((a, b) => (b.abr || 0) - (a.abr || 0));
 
   const videoStreams = formats
     .filter((f) => f.url && f.vcodec !== "none")
@@ -139,16 +130,18 @@ async function extractMetadata(url) {
       formatId: f.format_id,
       url: f.url,
       ext: f.ext,
-      resolution: f.resolution || `${f.width || 0}x${f.height || 0}`,
+      resolution: f.resolution || (f.height ? `${f.height}p` : `${f.width || 0}x${f.height || 0}`),
       width: f.width,
-      height: f.height,
+      height: f.height || 0,
       fps: f.fps,
       vcodec: f.vcodec,
       acodec: f.acodec,
       hasAudio: f.acodec && f.acodec !== "none",
       filesize: f.filesize || f.filesize_approx || null,
-      formatNote: f.format_note || null
-    }));
+      formatNote: f.format_note || null,
+      httpHeaders: f.http_headers || null
+    }))
+    .sort((a, b) => (b.height || 0) - (a.height || 0));
 
   return {
     id: rawData.id,
@@ -169,42 +162,30 @@ app.get("/", (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", message: "Server operational" });
+  res.json({ status: "ok" });
 });
 
-const handleExtract = async (req, res) => {
-  const targetUrl = req.query.url || (req.body && req.body.url);
+app.get("/api/extract", async (req, res) => {
+  const targetUrl = req.query.url;
 
   if (!targetUrl) {
-    return res.status(400).json({
-      success: false,
-      error: "Missing 'url' parameter. Provide ?url=... in query or JSON body { \"url\": \"...\" }"
-    });
+    return res.status(400).json({ success: false, error: "Missing 'url' query parameter" });
   }
 
   try {
     const data = await extractMetadata(targetUrl);
-    return res.json({
-      success: true,
-      data
-    });
-  } catch (error) {
-    console.error("Extraction error:", error.message);
-    return res.status(500).json({
-      success: false,
-      error: error.message || "Failed to process media URL"
-    });
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error("Extraction error:", err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
-};
-
-app.get("/api/extract", handleExtract);
-app.post("/api/extract", handleExtract);
-
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
 });
 
+
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`EdgeDL Server running on http://localhost:${PORT}`);
+});
 
 export default app;
