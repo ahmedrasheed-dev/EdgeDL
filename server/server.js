@@ -91,6 +91,7 @@ async function runYtDlp(url) {
     "--skip-download",
     "--no-warnings",
     "--no-check-certificates",
+    "--extractor-args", "youtube:player_client=mweb,ios,android_vr,tv_embedded",
     url
   ];
 

@@ -31,7 +31,7 @@ interface MediaData {
   isFromCache?: boolean
 }
 
-const SERVER_URL = "http://localhost:5000"
+const SERVER_URL = "https://edgedl.onrender.com"
 
 const getCacheKey = (rawUrl: string) => "edgedl_cache_" + encodeURIComponent(rawUrl.trim())
 
