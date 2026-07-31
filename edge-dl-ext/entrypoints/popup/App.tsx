@@ -32,6 +32,7 @@ interface MediaData {
 }
 
 const SERVER_URL = "https://edgedl.onrender.com"
+// const SERVER_URL = "http://localhost:5000"
 
 const getCacheKey = (rawUrl: string) => "edgedl_cache_" + encodeURIComponent(rawUrl.trim())
 
@@ -288,20 +289,18 @@ function App() {
         <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-900/90 border border-slate-800/80 rounded-xl mb-4 text-xs font-medium">
           <button
             onClick={() => setActiveTab("web")}
-            className={`py-2 rounded-lg transition-all flex items-center justify-center gap-2 ${
-              activeTab === "web"
-                ? "bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-semibold shadow-md shadow-indigo-600/30"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-            }`}>
+            className={`py-2 rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === "web"
+              ? "bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-semibold shadow-md shadow-indigo-600/30"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+              }`}>
             <span>🌐</span> Web Extractor & Muxer
           </button>
           <button
             onClick={() => setActiveTab("local")}
-            className={`py-2 rounded-lg transition-all flex items-center justify-center gap-2 ${
-              activeTab === "local"
-                ? "bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-semibold shadow-md shadow-indigo-600/30"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-            }`}>
+            className={`py-2 rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === "local"
+              ? "bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-semibold shadow-md shadow-indigo-600/30"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+              }`}>
             <span>📁</span> Local File Muxer
           </button>
         </div>
@@ -317,11 +316,10 @@ function App() {
         {/* Global Download / Mux Status Bar */}
         {(downloadState.isProcessing || downloadState.error) && (
           <div
-            className={`p-3.5 border rounded-xl mb-4 space-y-2 ${
-              downloadState.error
-                ? "bg-rose-950/40 border-rose-500/30 text-rose-300"
-                : "bg-indigo-950/40 border-indigo-500/30 text-indigo-300"
-            }`}>
+            className={`p-3.5 border rounded-xl mb-4 space-y-2 ${downloadState.error
+              ? "bg-rose-950/40 border-rose-500/30 text-rose-300"
+              : "bg-indigo-950/40 border-indigo-500/30 text-indigo-300"
+              }`}>
             <div className="flex justify-between items-center text-xs">
               <span className="font-semibold flex items-center gap-2 truncate pr-2">
                 {!downloadState.error && (

@@ -87,11 +87,10 @@ async function runYtDlp(url) {
   const args = [
     "--dump-json",
     "--no-playlist",
-    "--flat-playlist",
     "--skip-download",
     "--no-warnings",
     "--no-check-certificates",
-    "--extractor-args", "youtube:player_client=mweb,ios,android_vr,tv_embedded",
+    "--extractor-args", "youtube:player_client=tv_embedded,mweb,ios",
     url
   ];
 
