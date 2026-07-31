@@ -69,11 +69,16 @@ async function getFFmpegCore(): Promise<any> {
       throw new Error("FFmpeg WASM initialized but core.FS is unavailable");
     }
 
+    let lastSetProgressTime = 0;
     if (typeof core.setProgress === "function") {
       core.setProgress((progressObj: { progress: number; time: number }) => {
-        if (progressObj && typeof progressObj.progress === "number") {
-          const percent = Math.min(99, Math.round(progressObj.progress * 100));
-          sendStatus(`Muxing video & audio... (${percent}%)`, 50 + Math.round(progressObj.progress * 45));
+        const now = Date.now();
+        if (now - lastSetProgressTime > 300) {
+          lastSetProgressTime = now;
+          if (progressObj && typeof progressObj.progress === "number") {
+            const percent = Math.min(99, Math.round(progressObj.progress * 100));
+            sendStatus(`Muxing video & audio... (${percent}%)`, 50 + Math.round(progressObj.progress * 45));
+          }
         }
       });
     }
@@ -134,7 +139,7 @@ async function fetchStreamToBuffer(
       }
     }
 
-    if (totalBytes > 1024 * 1024 && (isRangeSupported || url.includes("googlevideo.com") || url.includes("cdn") || url.startsWith("blob:"))) {
+    if (totalBytes > 512 * 1024 && (isRangeSupported || url.includes("googlevideo.com") || url.includes("cdn") || url.startsWith("blob:"))) {
       const CHUNK_SIZE = 1.5 * 1024 * 1024; // 1.5 MB chunks (Optimal for YouTube CDN)
       const totalChunks = Math.ceil(totalBytes / CHUNK_SIZE);
       const result = new Uint8Array(totalBytes);
@@ -176,10 +181,13 @@ async function fetchStreamToBuffer(
     console.warn(`[Parallel Download] Range fetch unavailable for ${label}, falling back to stream:`, err);
   }
 
-  // High-performance single-request fetcher for small files or fallbacks using native C++ XHR ArrayBuffer
+  // High-performance single-request fetcher for small files with explicit Range: bytes=0- header (Bypasses YouTube throttling)
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("GET", url, true);
+    if (url.includes("googlevideo.com") || url.includes("cdn")) {
+      xhr.setRequestHeader("Range", "bytes=0-");
+    }
     xhr.responseType = "arraybuffer";
 
     let lastReport = 0;
@@ -249,6 +257,9 @@ async function processWebMux(payload: {
       safeWriteFS(core, "/input_audio.m4a", audioBuffer);
 
       sendStatus("Muxing video + audio with FFmpeg WASM...", 50);
+      // Yield main thread microtask so browser stays completely smooth during 4K/large video muxing
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       core.exec("-i", "/input_video.mp4", "-i", "/input_audio.m4a", "-c", "copy", "-movflags", "+faststart", "/output.mp4");
 
       sendStatus("Preparing merged video output...", 96);
@@ -339,6 +350,8 @@ async function processLocalFileMux(payload: {
     safeWriteFS(core, inAud, audioBuffer);
 
     sendStatus("Executing FFmpeg command...", 45);
+    // Yield main thread microtask before C++ execution
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     let argsToUse: string[];
     if (ffmpegArgs && ffmpegArgs.length > 0) {
