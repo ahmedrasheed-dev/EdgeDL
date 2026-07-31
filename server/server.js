@@ -86,6 +86,7 @@ async function runYtDlp(url) {
 
   const args = [
     "--dump-json",
+    "--no-playlist",
     "--no-warnings",
     "--no-check-certificates",
     url
