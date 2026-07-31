@@ -22,7 +22,13 @@ const BIN_PATH = process.env.YT_DLP_PATH || path.join(BIN_DIR, BIN_NAME);
 
 async function ensureYtDlpBinary() {
   if (fs.existsSync(BIN_PATH)) {
-    return BIN_PATH;
+    // Periodically update binary to latest release if older than 12 hours
+    try {
+      const stats = fs.statSync(BIN_PATH);
+      const ageHours = (Date.now() - stats.mtimeMs) / (1000 * 60 * 60);
+      if (ageHours < 12) return BIN_PATH;
+      console.log(`yt-dlp binary is ${ageHours.toFixed(1)}h old. Updating to latest...`);
+    } catch (_) {}
   }
 
   if (!fs.existsSync(BIN_DIR)) {
@@ -55,7 +61,7 @@ async function ensureYtDlpBinary() {
               if (!IS_WINDOWS) {
                 fs.chmodSync(BIN_PATH, 0o755);
               }
-              console.log("yt-dlp binary downloaded successfully.");
+              console.log("yt-dlp binary downloaded & updated successfully.");
               resolve(BIN_PATH);
             });
           });
@@ -75,10 +81,10 @@ async function ensureYtDlpBinary() {
 async function runYtDlp(url) {
   let executable = BIN_PATH;
 
-  if (!fs.existsSync(BIN_PATH)) {
-    try {
-      executable = await ensureYtDlpBinary();
-    } catch (err) {
+  try {
+    executable = await ensureYtDlpBinary();
+  } catch (err) {
+    if (!fs.existsSync(BIN_PATH)) {
       console.warn("Could not download local yt-dlp, attempting system 'yt-dlp':", err.message);
       executable = "yt-dlp";
     }
@@ -105,6 +111,9 @@ async function runYtDlp(url) {
       fs.writeFileSync(tmpCookies, cookieData);
       args.push("--cookies", tmpCookies);
     } catch (_) {}
+  } else if (IS_WINDOWS && process.env.NODE_ENV !== "production") {
+    // For local Windows development, attempt to read directly from local Chrome browser cookies
+    args.push("--cookies-from-browser", "chrome");
   }
 
   return new Promise((resolve, reject) => {

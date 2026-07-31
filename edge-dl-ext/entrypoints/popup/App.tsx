@@ -141,6 +141,127 @@ function App() {
     })
   }
 
+  const extractYouTubeId = (url: string): string | null => {
+    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+    return match ? match[1] : null;
+  }
+
+  const extractClientSideYouTube = async (url: string): Promise<MediaData | null> => {
+    const videoId = extractYouTubeId(url);
+    if (!videoId) return null;
+
+    try {
+      let json: any = null;
+
+      // 1. Try reading directly from active YouTube tab memory via content script
+      try {
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (activeTab?.id && activeTab?.url?.includes("youtube.com")) {
+          const tabResp = await chrome.tabs.sendMessage(activeTab.id, { type: "GET_PAGE_MEDIA" });
+          if (tabResp?.success && tabResp?.data?.streamingData) {
+            json = tabResp.data;
+          }
+        }
+      } catch (_) {}
+
+      // 2. If tab memory unavailable, fetch youtubei API using ANDROID client (returns direct URLs for all videos)
+      if (!json) {
+        const resp = await fetch("https://www.youtube.com/youtubei/v1/player", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-YouTube-Client-Name": "3",
+            "X-YouTube-Client-Version": "19.02.39"
+          },
+          body: JSON.stringify({
+            videoId: videoId,
+            context: {
+              client: {
+                clientName: "ANDROID",
+                clientVersion: "19.02.39",
+                androidSdkVersion: 30,
+                hl: "en",
+                gl: "US"
+              }
+            }
+          })
+        });
+
+        if (resp.ok) {
+          json = await resp.json();
+        }
+      }
+
+      if (!json || !json.streamingData) return null;
+      const streamingData = json.streamingData;
+
+      const details = json.videoDetails || {};
+      const allFormats = [...(streamingData.formats || []), ...(streamingData.adaptiveFormats || [])];
+
+      const audioStreams: StreamInfo[] = [];
+      const videoStreams: StreamInfo[] = [];
+
+      for (const f of allFormats) {
+        const streamUrl = f.url || (f.signatureCipher ? new URLSearchParams(f.signatureCipher).get("url") : (f.cipher ? new URLSearchParams(f.cipher).get("url") : null));
+        if (!streamUrl) continue;
+
+        const isAudio = f.mimeType?.includes("audio") || (f.acodec && f.acodec !== "none" && !f.height);
+        const isVideo = f.mimeType?.includes("video") || (f.height && f.height > 0);
+
+        if (isAudio && !isVideo) {
+          audioStreams.push({
+            formatId: String(f.itag),
+            url: streamUrl,
+            ext: f.mimeType?.includes("webm") ? "webm" : "m4a",
+            acodec: f.mimeType,
+            abr: Math.round((f.bitrate || 0) / 1000),
+            filesize: f.contentLength ? parseInt(f.contentLength, 10) : null,
+            formatNote: f.audioQuality || "audio"
+          });
+        } else if (isVideo) {
+          const hasAudio = !!(f.mimeType?.includes("audio") || (f.audioChannels && f.audioChannels > 0));
+          videoStreams.push({
+            formatId: String(f.itag),
+            url: streamUrl,
+            ext: f.mimeType?.includes("webm") ? "webm" : "mp4",
+            resolution: f.qualityLabel || (f.height ? `${f.height}p` : "video"),
+            width: f.width,
+            height: f.height || 0,
+            fps: f.fps || 30,
+            vcodec: f.mimeType,
+            acodec: hasAudio ? "audio" : "none",
+            hasAudio,
+            filesize: f.contentLength ? parseInt(f.contentLength, 10) : null,
+            formatNote: f.qualityLabel || null
+          });
+        }
+      }
+
+      videoStreams.sort((a, b) => (b.height || 0) - (a.height || 0));
+      audioStreams.sort((a, b) => (b.abr || 0) - (a.abr || 0));
+
+      if (videoStreams.length === 0 && audioStreams.length === 0) return null;
+
+      const thumbs = details.thumbnail?.thumbnails || [];
+      const thumbnail = thumbs.length > 0 ? thumbs[thumbs.length - 1].url : undefined;
+
+      return {
+        id: videoId,
+        title: details.title || "YouTube Video",
+        description: details.shortDescription,
+        thumbnail,
+        duration: parseInt(details.lengthSeconds || "0", 10),
+        uploader: details.author,
+        webpageUrl: url,
+        extractor: "youtube:innertube",
+        audioStreams,
+        videoStreams
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
   const extractMediaForUrl = async (targetUrl: string, forceRefresh = false) => {
     const trimmed = targetUrl.trim()
     if (!trimmed) return
@@ -162,14 +283,29 @@ function App() {
     setMediaData(null)
 
     try {
-      const response = await fetch(`${SERVER_URL}/api/extract?url=${encodeURIComponent(trimmed)}`)
-      const json = await response.json()
+      let data: MediaData | null = null
 
-      if (!json.success || !json.data) {
-        throw new Error(json.error || "Failed to extract media streams")
+      // For YouTube URLs, run Client-Side Innertube extraction first (bypasses cloud IP bot blocks)
+      if (trimmed.includes("youtube.com") || trimmed.includes("youtu.be")) {
+        console.log("[EdgeDL] Running client-side YouTube extraction...")
+        data = await extractClientSideYouTube(trimmed)
       }
 
-      const data: MediaData = json.data
+      // If client-side failed or not YouTube, try backend server
+      if (!data) {
+        try {
+          const response = await fetch(`${SERVER_URL}/api/extract?url=${encodeURIComponent(trimmed)}`)
+          const json = await response.json()
+          if (json.success && json.data) {
+            data = json.data
+          }
+        } catch (_) {}
+      }
+
+      if (!data) {
+        throw new Error("Failed to extract video streams. Please check the URL.")
+      }
+
       setMediaData({ ...data, isFromCache: false })
 
       if (data.videoStreams?.length > 0) setSelectedVideo(data.videoStreams[0])
@@ -177,7 +313,7 @@ function App() {
 
       await setCachedMediaData(trimmed, data)
     } catch (err: any) {
-      setError(err.message || "Failed to connect to backend server")
+      setError(err.message || "Failed to extract media streams")
     } finally {
       setLoading(false)
     }
