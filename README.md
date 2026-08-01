@@ -10,6 +10,28 @@ EdgeDL consists of two parts:
 
 ---
 
+## 🛠️ Tech Stack
+
+Built with modern frontend standards, client-side WebAssembly, and native desktop integration:
+
+### 🧩 Browser Extension (`/edge-dl-ext`)
+- **UI & Logic**: React 19, TypeScript, Tailwind CSS v4
+- **Extension Framework**: WXT (Web Extension Tools) — Chrome Manifest V3 compliant
+- **In-Browser Processing**: FFmpeg WebAssembly (`@ffmpeg/ffmpeg`) for client-side audio/video muxing without external servers
+
+### 🖥️ Desktop Companion App (`/desktop-app`)
+- **Runtime & Desktop Layer**: Electron, Node.js
+- **Local API Server**: Express.js (CORS-enabled REST API for Extension-to-Desktop communication)
+- **Video Extraction Engine**: `yt-dlp` integration for high-resolution (4K / 2K / 1080p) stream extraction
+- **Installer & Distribution**: Electron Builder (NSIS Windows Installer & Portable builds)
+
+### 🏛️ Architecture & Engineering Highlights
+- **Hybrid Desktop/Web Architecture**: Offline-first WebAssembly worker threads for local file muxing paired with native desktop background service for network stream fetching.
+- **Privacy & Performance**: 100% client-side execution — zero media data or user analytics sent to remote servers.
+- **Modern Standards**: Fully typed with TypeScript and compliant with Chrome Extension Manifest V3 specifications.
+
+---
+
 ## Features
 
 - **High Resolution Downloads**: Extract 4K, 2K, 1080p, and 60fps video streams from YouTube and other video platforms.

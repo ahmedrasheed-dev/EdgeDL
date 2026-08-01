@@ -5,7 +5,7 @@ export default defineBackground(() => {
     isProcessing: false,
     status: "",
     progress: 0,
-    error: null as string | null,
+    error: null as string | null, 
     mode: "idle"
   };
 
