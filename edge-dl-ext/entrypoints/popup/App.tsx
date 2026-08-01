@@ -161,7 +161,7 @@ function App() {
             json = tabResp.data;
           }
         }
-      } catch (_) {}
+      } catch (_) { }
 
       // 2. If tab memory unavailable, fetch youtubei API using ANDROID client (returns direct URLs for all videos)
       if (!json) {
@@ -403,9 +403,7 @@ function App() {
         {/* Header */}
         <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800/80">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-emerald-400 flex items-center justify-center font-black text-lg text-white shadow-lg shadow-indigo-500/25">
-              E
-            </div>
+            <img src="./icon.png" alt="EdgeDL" className="w-9 h-9" />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-sm font-bold tracking-wide text-white">EdgeDL</h1>
@@ -429,7 +427,7 @@ function App() {
               ? "bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-semibold shadow-md shadow-indigo-600/30"
               : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
               }`}>
-            <span>🌐</span> Web Extractor & Muxer
+            <span>🌐</span> Video Downloader
           </button>
           <button
             onClick={() => setActiveTab("local")}
@@ -613,7 +611,7 @@ function App() {
                       d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                     />
                   </svg>
-                  Download & Mux (Client-Side WASM)
+                  Download
                 </button>
               </div>
             )}
@@ -750,7 +748,7 @@ function App() {
                   Reading Files into Memory...
                 </>
               ) : (
-                <>⚡ Mux Video & Audio (FFmpeg WASM)</>
+                <>⚡ Merge Video & Audio</>
               )}
             </button>
           </div>
@@ -759,8 +757,10 @@ function App() {
 
       {/* Footer */}
       <div className="pt-3 border-t border-slate-900 text-center text-[10px] text-slate-500 flex items-center justify-between">
-        <span>FFmpeg.wasm 0.12 • WXT + React</span>
-        <span>Client-Side Zero Server Mux</span>
+        <span className="flex items-center gap-1">
+          By:
+          <a className='text-amber-400 hover:underline' href="https://github.com/ahmedrasheed-dev" target="_blank" rel="noopener noreferrer">ahmedrasheed-dev </a>
+        </span>
       </div>
     </div>
   )

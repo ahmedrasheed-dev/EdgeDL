@@ -138,7 +138,7 @@ export default defineBackground(() => {
       pendingPayload = message.payload;
       currentStatus = {
         isProcessing: true,
-        status: "Initializing FFmpeg WASM engine...",
+        status: "Starting media converter...",
         progress: 5,
         error: null,
         mode: message.payload?.mode || "web"
@@ -151,8 +151,8 @@ export default defineBackground(() => {
         })
         .catch((err) => {
           currentStatus.isProcessing = false;
-          currentStatus.error = err.message || "Failed to launch offscreen process";
-          currentStatus.status = "Worker launch failed";
+          currentStatus.error = err.message || "Failed to launch background converter";
+          currentStatus.status = "Launch failed";
           broadcastStatus();
         });
 
@@ -173,7 +173,7 @@ export default defineBackground(() => {
 
     if (message.type === "DOWNLOAD_READY") {
       currentStatus.isProcessing = false;
-      currentStatus.status = "Muxing complete! Saving file...";
+      currentStatus.status = "Processing complete! Saving file...";
       currentStatus.progress = 100;
       pendingPayload = null;
       broadcastStatus();

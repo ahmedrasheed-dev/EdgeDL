@@ -34,21 +34,21 @@ async function getFFmpegCore(): Promise<any> {
     const jsUrl = browser.runtime.getURL("ffmpeg/ffmpeg-core.js");
     const wasmUrl = browser.runtime.getURL("ffmpeg/ffmpeg-core.wasm");
 
-    sendStatus("Fetching FFmpeg WASM binary...", 8);
+    sendStatus("Loading processing engine...", 8);
     const wasmResp = await fetch(wasmUrl);
     if (!wasmResp.ok) {
-      throw new Error(`Failed to load WASM binary (HTTP ${wasmResp.status})`);
+      throw new Error(`Failed to load engine core (HTTP ${wasmResp.status})`);
     }
     const wasmBinary = await wasmResp.arrayBuffer();
 
-    sendStatus("Loading FFmpeg engine script...", 12);
+    sendStatus("Loading engine scripts...", 12);
     if (typeof (window as any).createFFmpegCore !== "function") {
       const script = document.createElement("script");
       script.src = jsUrl;
       document.head.appendChild(script);
       await new Promise((resolve, reject) => {
         script.onload = resolve;
-        script.onerror = () => reject(new Error("Failed to load ffmpeg-core.js script tag"));
+        script.onerror = () => reject(new Error("Failed to load engine script tag"));
       });
     }
 
@@ -56,7 +56,7 @@ async function getFFmpegCore(): Promise<any> {
       throw new Error("createFFmpegCore not found on window after script load");
     }
 
-    sendStatus("Instantiating WebAssembly Core...", 16);
+    sendStatus("Initializing converter engine...", 16);
 
     const core = await (window as any).createFFmpegCore({
       wasmBinary,
@@ -66,7 +66,7 @@ async function getFFmpegCore(): Promise<any> {
     });
 
     if (!core || !core.FS || typeof core.FS.writeFile !== "function") {
-      throw new Error("FFmpeg WASM initialized but core.FS is unavailable");
+      throw new Error("Converter engine initialized but storage is unavailable");
     }
 
     let lastSetProgressTime = 0;
@@ -77,18 +77,18 @@ async function getFFmpegCore(): Promise<any> {
           lastSetProgressTime = now;
           if (progressObj && typeof progressObj.progress === "number") {
             const percent = Math.min(99, Math.round(progressObj.progress * 100));
-            sendStatus(`Muxing video & audio... (${percent}%)`, 50 + Math.round(progressObj.progress * 45));
+            sendStatus(`Merging video & audio... (${percent}%)`, 50 + Math.round(progressObj.progress * 45));
           }
         }
       });
     }
 
     ffmpegCoreInstance = core;
-    sendStatus("FFmpeg WASM engine ready!", 20);
+    sendStatus("Engine ready!", 20);
     return core;
   } catch (err: any) {
     console.error("FFmpeg Core init failed:", err);
-    throw new Error("FFmpeg WASM failed to initialize: " + (err?.message || String(err)));
+    throw new Error("Converter engine failed to initialize: " + (err?.message || String(err)));
   }
 }
 
@@ -243,7 +243,7 @@ async function processWebMux(payload: {
     startKeepAlive();
 
     if (audioUrl) {
-      sendStatus("Downloading video & audio streams in parallel...", 5);
+      sendStatus("Downloading video & audio tracks...", 5);
 
       const [videoBuffer, audioBuffer] = await Promise.all([
         fetchStreamToBuffer(videoUrl, [5, 40], "Video Track"),
@@ -252,17 +252,17 @@ async function processWebMux(payload: {
 
       const core = await getFFmpegCore();
 
-      sendStatus("Writing streams to WASM virtual memory...", 45);
+      sendStatus("Preparing video and audio tracks...", 45);
       safeWriteFS(core, "/input_video.mp4", videoBuffer);
       safeWriteFS(core, "/input_audio.m4a", audioBuffer);
 
-      sendStatus("Muxing video + audio with FFmpeg WASM...", 50);
+      sendStatus("Combining video & audio...", 50);
       // Yield main thread microtask so browser stays completely smooth during 4K/large video muxing
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       core.exec("-i", "/input_video.mp4", "-i", "/input_audio.m4a", "-c", "copy", "-movflags", "+faststart", "/output.mp4");
 
-      sendStatus("Preparing merged video output...", 96);
+      sendStatus("Finalizing video file...", 96);
       const data = core.FS.readFile("/output.mp4");
 
       safeUnlinkFS(core, "/input_video.mp4");
@@ -280,7 +280,7 @@ async function processWebMux(payload: {
       }).catch(() => {});
 
     } else {
-      sendStatus("Downloading video stream...", 5);
+      sendStatus("Downloading video...", 5);
       const videoBuffer = await fetchStreamToBuffer(videoUrl, [5, 95], "Video");
 
       const blob = new Blob([videoBuffer.buffer], { type: "video/mp4" });
@@ -297,7 +297,7 @@ async function processWebMux(payload: {
     console.error("Web Mux error:", err);
     chrome.runtime.sendMessage({
       type: "PROCESS_ERROR",
-      error: err?.message || "Web muxing failed"
+      error: err?.message || "Video download failed"
     }).catch(() => {});
   } finally {
     stopKeepAlive();
@@ -327,7 +327,7 @@ async function processLocalFileMux(payload: {
 
   try {
     startKeepAlive();
-    sendStatus("Fetching local video and audio files...", 5);
+    sendStatus("Loading selected media files...", 5);
 
     const [videoBuffer, audioBuffer] = await Promise.all([
       fetchStreamToBuffer(videoUrl, [5, 20], "Video File"),
@@ -338,18 +338,18 @@ async function processLocalFileMux(payload: {
     try { URL.revokeObjectURL(videoUrl); } catch (_) {}
     try { URL.revokeObjectURL(audioUrl); } catch (_) {}
 
-    sendStatus("Initializing FFmpeg WASM Core...", 22);
+    sendStatus("Initializing converter engine...", 22);
     const core = await getFFmpegCore();
 
     const inVid = `/input_video.${videoExt}`;
     const inAud = `/input_audio.${audioExt}`;
     const outVid = `/output.${outputFormat}`;
 
-    sendStatus("Writing local files to WASM memory...", 30);
+    sendStatus("Processing video and audio data...", 30);
     safeWriteFS(core, inVid, videoBuffer);
     safeWriteFS(core, inAud, audioBuffer);
 
-    sendStatus("Executing FFmpeg command...", 45);
+    sendStatus("Combining files...", 45);
     // Yield main thread microtask before C++ execution
     await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -363,7 +363,7 @@ async function processLocalFileMux(payload: {
     console.log("Executing core.exec with args:", argsToUse);
     core.exec(...argsToUse);
 
-    sendStatus("Reading output file...", 95);
+    sendStatus("Preparing download...", 95);
     const data = core.FS.readFile(outVid);
 
     safeUnlinkFS(core, inVid);
