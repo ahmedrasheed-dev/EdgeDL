@@ -45,6 +45,8 @@ export default defineBackground(() => {
             },
             condition: {
               urlFilter: "googlevideo.com",
+              // Restrict to extension-only requests so YouTube's native player is NOT affected
+              initiatorDomains: [chrome.runtime.id],
               resourceTypes: [
                 "xmlhttprequest" as any,
                 "other" as any,

@@ -152,42 +152,59 @@ function App() {
     try {
       let json: any = null;
 
-      // 1. Try reading directly from active YouTube tab memory via content script
-      try {
-        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (activeTab?.id && activeTab?.url?.includes("youtube.com")) {
-          const tabResp = await chrome.tabs.sendMessage(activeTab.id, { type: "GET_PAGE_MEDIA" });
-          if (tabResp?.success && tabResp?.data?.streamingData) {
-            json = tabResp.data;
-          }
-        }
-      } catch (_) { }
-
-      // 2. If tab memory unavailable, fetch youtubei API using ANDROID client (returns direct URLs for all videos)
+      // Skip reading ytInitialPlayerResponse from the page DOM (WEB client):
+      // - It only returns muxed non-DASH formats (360p/720p) 
+      // - Its adaptiveFormats use signatureCipher which requires JS decryption to use
+      // Always go directly to ANDROID_VR which returns full DASH adaptive formats with direct URLs.
       if (!json) {
-        const resp = await fetch("https://www.youtube.com/youtubei/v1/player", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-YouTube-Client-Name": "3",
-            "X-YouTube-Client-Version": "19.02.39"
+        const clientWaterfall = [
+          {
+            name: "ANDROID_VR",
+            version: "1.59.19",
+            header: "28",
+            ua: "com.google.android.apps.youtube.vr/1.59.19 (Linux; U; Android 10; en_US; Oculus Quest 2)",
+            context: { clientName: "ANDROID_VR", clientVersion: "1.59.19", hl: "en", gl: "US" }
           },
-          body: JSON.stringify({
-            videoId: videoId,
-            context: {
-              client: {
-                clientName: "ANDROID",
-                clientVersion: "19.02.39",
-                androidSdkVersion: 30,
-                hl: "en",
-                gl: "US"
-              }
-            }
-          })
-        });
+          {
+            name: "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
+            version: "2.0",
+            header: "85",
+            ua: "Mozilla/5.0 (PlayStation 4 9.00) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+            context: { clientName: "TVHTML5_SIMPLY_EMBEDDED_PLAYER", clientVersion: "2.0", hl: "en", gl: "US" }
+          }
+        ];
 
-        if (resp.ok) {
-          json = await resp.json();
+        for (const client of clientWaterfall) {
+          try {
+            const resp = await fetch("https://www.youtube.com/youtubei/v1/player", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-YouTube-Client-Name": client.header,
+                "X-YouTube-Client-Version": client.version,
+                "User-Agent": client.ua,
+                "Referer": "https://www.youtube.com/",
+                "Origin": "https://www.youtube.com"
+              },
+              body: JSON.stringify({
+                videoId: videoId,
+                context: { client: client.context }
+              })
+            });
+
+            if (!resp.ok) continue;
+            const candidate = await resp.json();
+            // Only accept if we got actual streaming data (prefer clients that return adaptive DASH)
+            const hasAdaptive = (candidate?.streamingData?.adaptiveFormats?.length ?? 0) > 0;
+            const hasFormats = (candidate?.streamingData?.formats?.length ?? 0) > 0;
+            if (candidate?.streamingData && (hasAdaptive || hasFormats)) {
+              json = candidate;
+              console.log("[EdgeDL] Innertube OK via", client.name,
+                "| formats:", candidate.streamingData.formats?.length ?? 0,
+                "| adaptiveFormats:", candidate.streamingData.adaptiveFormats?.length ?? 0);
+              break;
+            }
+          } catch (_) { }
         }
       }
 
