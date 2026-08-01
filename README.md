@@ -1,5 +1,7 @@
 # EdgeDL
 
+🌐 **Website**: [https://ahmedrasheed-dev.github.io/EdgeDL/](https://ahmedrasheed-dev.github.io/EdgeDL/)
+
 High-performance video downloader and media merger for Chrome and Windows.
 
 EdgeDL consists of two parts:
