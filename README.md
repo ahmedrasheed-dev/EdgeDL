@@ -22,12 +22,15 @@ EdgeDL consists of two parts:
 
 ### Option 1: Quick Install (Recommended)
 
-1. Download the latest release from the **[Releases](https://github.com/ahmedrasheed-dev/EdgeDL/releases)** page.
-2. Run **`EdgeDL Companion Setup 1.0.0.exe`** to install the Windows desktop companion.
-3. In Google Chrome:
-   - Open `chrome://extensions`
-   - Enable **Developer mode** (top right toggle)
-   - Click **Load unpacked** and select the extension build folder (`edge-dl-ext/.output/chrome-mv3`).
+1. Download the latest release files from **[Releases](https://github.com/ahmedrasheed-dev/EdgeDL/releases)**:
+   - **`EdgeDL Companion Setup 1.0.0.exe`** (Desktop Companion App)
+   - **`edge-dl-extension.zip`** (Chrome Extension)
+2. Run **`EdgeDL Companion Setup 1.0.0.exe`** to install the Windows companion app.
+3. Extract **`edge-dl-extension.zip`** to a folder on your PC.
+4. Load the Extension in Google Chrome:
+   - Go to `chrome://extensions` in your browser.
+   - Enable **Developer mode** (toggle switch in the top right corner).
+   - Click **Load unpacked** and select the extracted extension folder.
 
 ---
 
