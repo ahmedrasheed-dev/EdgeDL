@@ -1,0 +1,57 @@
+{
+  "name": "edgedl-standalone",
+  "version": "1.4.6",
+  "description": "EdgeDL Standalone High-Speed Video & Audio Downloader",
+  "author": "ahmedrasheed-dev",
+  "license": "ISC",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win nsis",
+    "build:portable": "electron-builder --win portable"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "ffmpeg-static": "^5.3.0"
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.edgedl.standalone",
+    "productName": "EdgeDL Standalone",
+    "publish": null,
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "EdgeDL Standalone"
+    },
+    "files": [
+      "main.js",
+      "server/**/*",
+      "ui/**/*",
+      "icon.png",
+      "icon.ico",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/ffmpeg-static",
+        "to": "ffmpeg-static"
+      }
+    ]
+  }
+}

@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EdgeDL Standalone - Native Video & Audio Downloader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-theme="blue">
+  <div class="app-container">
+    <!-- Titlebar -->
+    <header class="titlebar">
+      <div class="titlebar-brand">
+        <img src="../icon.png" alt="EdgeDL" class="titlebar-logo-img" />
+        <div class="titlebar-text">
+          <span class="titlebar-title">EdgeDL Standalone</span>
+          <span class="titlebar-version">v1.4.6</span>
+        </div>
+      </div>
+
+      <div class="server-status-pill" id="server-status-pill" title="Click to change port">
+        <span class="status-dot"></span>
+        <span id="server-status-text">Using port 5000</span>
+        <button id="btn-edit-port" class="icon-btn-inline" title="Change Port">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        </button>
+      </div>
+
+      <!-- Theme Switcher Swatches -->
+      <div class="theme-switcher" title="Select Theme Accent Color">
+        <button class="theme-dot blue active" data-theme="blue" title="Neon Blue"></button>
+        <button class="theme-dot emerald" data-theme="emerald" title="Emerald Green"></button>
+        <button class="theme-dot purple" data-theme="purple" title="Cyber Purple"></button>
+        <button class="theme-dot amber" data-theme="amber" title="Sunset Amber"></button>
+      </div>
+
+      <div class="titlebar-controls">
+        <button class="win-btn" id="btn-minimize" title="Minimize">—</button>
+        <button class="win-btn" id="btn-maximize" title="Maximize">□</button>
+        <button class="win-btn close-btn" id="btn-close" title="Close to Tray">✕</button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Grid -->
+    <main class="content-grid">
+      <!-- Left Panel: Extractor & Options -->
+      <section class="panel control-panel">
+        <div class="panel-header">
+          <h2>Media Downloader</h2>
+          <p>Extract native high-quality streams from supported platforms</p>
+        </div>
+
+        <!-- Download Mode Selector (Segmented Toggle) -->
+        <div class="segmented-control" id="download-mode-selector">
+          <button class="segmented-btn active" data-mode="video-audio" id="mode-video-audio">Video + Audio</button>
+          <button class="segmented-btn" data-mode="video-only" id="mode-video-only">Video Only</button>
+          <button class="segmented-btn" data-mode="audio-only" id="mode-audio-only">Audio Only</button>
+        </div>
+
+        <!-- URL Input Group -->
+        <div class="url-input-container">
+          <div class="input-wrapper">
+            <input type="text" id="url-input" placeholder="Paste video, audio, or playlist URL..." autocomplete="off" />
+            <button id="btn-paste" class="btn-input-action" title="Paste from clipboard">Paste</button>
+          </div>
+          <button id="btn-analyze" class="primary-btn">
+            <span id="analyze-spinner" class="spinner hidden"></span>
+            <span id="analyze-btn-text">Analyze URL</span>
+          </button>
+        </div>
+
+        <!-- Error Banner -->
+        <div id="error-banner" class="error-banner hidden">
+          <svg class="error-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span id="error-message" class="error-text"></span>
+        </div>
+
+        <!-- Media Card -->
+        <div id="media-card" class="media-card hidden">
+          <div class="media-header">
+            <div class="media-thumb-wrapper">
+              <img id="media-thumb" src="" alt="Thumbnail" class="media-thumb" />
+            </div>
+            <div class="media-info">
+              <h3 id="media-title" class="media-title"></h3>
+              <p id="media-uploader" class="media-uploader"></p>
+              <div class="media-meta-row">
+                <span id="media-duration" class="meta-badge"></span>
+                <button id="btn-save-thumb" class="btn-thumb-action" title="Download High-Res Cover Image">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span>Save Cover</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="options-form">
+            <!-- Video Stream Selector -->
+            <div id="video-select-group" class="form-group">
+              <label for="select-video">Video Resolution</label>
+              <select id="select-video" class="custom-select"></select>
+            </div>
+
+            <!-- Audio Stream Selector -->
+            <div id="audio-select-group" class="form-group">
+              <label for="select-audio">Audio Track</label>
+              <select id="select-audio" class="custom-select"></select>
+            </div>
+
+            <!-- Container Format & Output Folder -->
+            <div class="form-row">
+              <div id="format-select-group" class="form-group flex-1">
+                <label for="select-format">Format</label>
+                <select id="select-format" class="custom-select">
+                  <option value="mp4">MP4 (.mp4)</option>
+                  <option value="mkv">MKV (.mkv)</option>
+                  <option value="webm">WebM (.webm)</option>
+                </select>
+              </div>
+
+              <div class="form-group flex-2">
+                <label for="output-dir-input">Save Folder</label>
+                <div class="dir-picker-wrapper">
+                  <input type="text" id="output-dir-input" readonly placeholder="Downloads/EdgeDL" />
+                  <button id="btn-browse-dir" class="secondary-btn">Browse</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Speed Limit & Subtitles Controls -->
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="select-speed-limit">Speed Limit</label>
+                <select id="select-speed-limit" class="custom-select">
+                  <option value="unlimited">Unlimited</option>
+                  <option value="2M">2 MB/s</option>
+                  <option value="5M">5 MB/s</option>
+                  <option value="10M">10 MB/s</option>
+                  <option value="50M">50 MB/s</option>
+                </select>
+              </div>
+
+              <div class="form-group flex-1">
+                <label for="select-subtitles">Subtitles</label>
+                <select id="select-subtitles" class="custom-select">
+                  <option value="none">No Subtitles</option>
+                  <option value="embed">Embed in Video</option>
+                  <option value="srt">Save .SRT File</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Video Trimmer & Clip Extractor -->
+            <div class="trimmer-container">
+              <label class="checkbox-label trimmer-toggle">
+                <input type="checkbox" id="chk-enable-trimmer" />
+                <span>✂️ Trim Specific Clip / Range</span>
+              </label>
+              <div id="trimmer-inputs-row" class="form-row hidden" style="margin-top: 6px;">
+                <div class="form-group flex-1">
+                  <label for="trim-start-input">Start Time</label>
+                  <input type="text" id="trim-start-input" placeholder="01:30" class="custom-input-sm" />
+                </div>
+                <div class="form-group flex-1">
+                  <label for="trim-end-input">End Time</label>
+                  <input type="text" id="trim-end-input" placeholder="04:15" class="custom-input-sm" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Download Button -->
+            <button id="btn-start-download" class="download-action-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>Start Download</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Panel: Tasks Dashboard -->
+      <section class="panel tasks-panel">
+        <div class="panel-header flex-between">
+          <div>
+            <h2>Downloads</h2>
+            <p>Active tasks & historical progress</p>
+          </div>
+          <div class="task-tabs">
+            <button id="tab-active" class="tab-btn active">Active (<span id="count-active">0</span>)</button>
+            <button id="tab-completed" class="tab-btn">Completed (<span id="count-completed">0</span>)</button>
+          </div>
+        </div>
+
+        <!-- Active Tasks View -->
+        <div id="view-active-tasks" class="tasks-container">
+          <div id="active-empty-state" class="empty-state">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <p>No active downloads</p>
+            <span class="empty-subtext">Analyze a video URL to start downloading</span>
+          </div>
+          <div id="active-tasks-list" class="tasks-list"></div>
+        </div>
+
+        <!-- Completed Tasks View -->
+        <div id="view-completed-tasks" class="tasks-container hidden">
+          <div id="completed-empty-state" class="empty-state">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <p>No completed downloads yet</p>
+            <span class="empty-subtext">Completed files will be listed here</span>
+          </div>
+          <div id="completed-tasks-list" class="tasks-list"></div>
+        </div>
+
+        <!-- Storage Analytics Box -->
+        <div class="storage-stats-box" id="storage-stats-box">
+          <div class="stats-icon-wrapper">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          </div>
+          <div class="stats-info">
+            <div class="stats-title-row">
+              <span class="stats-label">Storage Usage</span>
+              <span id="stats-total-size" class="stats-value">0 MB</span>
+            </div>
+            <div class="stats-detail-row">
+              <span id="stats-file-count">0 Files downloaded</span>
+              <button id="btn-refresh-stats" class="icon-btn-inline" title="Refresh Storage Analytics">↻</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Beautiful Notice Box -->
+        <div class="tasks-notice-box">
+          <div class="notice-icon-wrapper">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          </div>
+          <div class="notice-content">
+            <span class="notice-title">Initialization Note:</span>
+            If a download takes a few moments to begin, please wait while YouTube signatures and stream links are decrypted.
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <span>Native yt-dlp & FFmpeg Engine</span>
+      <span>EdgeDL Standalone</span>
+    </footer>
+  </div>
+
+  <!-- Port Change Modal -->
+  <div id="port-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Server Port Settings</h3>
+        <button id="btn-close-modal" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>Set the local port for the EdgeDL background service:</p>
+        <div class="form-group">
+          <label for="port-input">Port Number</label>
+          <input type="number" id="port-input" min="1024" max="65535" value="5000" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-cancel-port" class="secondary-btn">Cancel</button>
+        <button id="btn-save-port" class="primary-btn">Save Port</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Playlist Item Selection Modal -->
+  <div id="playlist-modal" class="modal-overlay hidden">
+    <div class="modal-card playlist-modal-card">
+      <div class="modal-header">
+        <div class="playlist-modal-title">
+          <span class="playlist-icon">📚</span>
+          <div>
+            <h3 id="playlist-title">Playlist Selection</h3>
+            <span id="playlist-uploader-text" class="playlist-subtext">YouTube Playlist</span>
+          </div>
+        </div>
+        <button id="btn-close-playlist-modal" class="icon-btn">✕</button>
+      </div>
+
+      <!-- Playlist Download Settings Form -->
+      <div class="options-form playlist-options-form">
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="playlist-select-quality">Video Quality</label>
+            <select id="playlist-select-quality" class="custom-select">
+              <option value="best">Best Available (1080p+)</option>
+              <option value="1080p">1080p HD</option>
+              <option value="720p">720p HD</option>
+              <option value="480p">480p SD</option>
+              <option value="360p">360p SD</option>
+            </select>
+          </div>
+
+          <div class="form-group flex-1">
+            <label for="playlist-select-format">Format</label>
+            <select id="playlist-select-format" class="custom-select">
+              <option value="mp4">MP4 (.mp4)</option>
+              <option value="mkv">MKV (.mkv)</option>
+              <option value="webm">WebM (.webm)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="playlist-select-speed">Speed Limit</label>
+            <select id="playlist-select-speed" class="custom-select">
+              <option value="unlimited">Unlimited</option>
+              <option value="2M">2 MB/s</option>
+              <option value="5M">5 MB/s</option>
+              <option value="10M">10 MB/s</option>
+            </select>
+          </div>
+
+          <div class="form-group flex-1">
+            <label for="playlist-select-subtitles">Subtitles</label>
+            <select id="playlist-select-subtitles" class="custom-select">
+              <option value="none">No Subtitles</option>
+              <option value="embed">Embed in Video</option>
+              <option value="srt">Save .SRT File</option>
+            </select>
+          </div>
+
+          <div class="form-group flex-1">
+            <label for="playlist-select-thumbnails">Thumbnails</label>
+            <select id="playlist-select-thumbnails" class="custom-select">
+              <option value="none">No Cover Image</option>
+              <option value="download">Save .JPG Cover</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Playlist Selection Controls & Search Bar -->
+      <div class="playlist-controls-bar">
+        <div class="playlist-search-wrapper">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="playlist-search-input" placeholder="Search playlist videos..." autocomplete="off" />
+        </div>
+
+        <div class="quick-select-pills">
+          <button id="btn-select-all" class="pill-btn active">All</button>
+          <button id="btn-deselect-all" class="pill-btn">None</button>
+          <button id="btn-select-top5" class="pill-btn">Top 5</button>
+          <button id="btn-select-top10" class="pill-btn">Top 10</button>
+        </div>
+      </div>
+
+      <!-- Playlist Summary Row -->
+      <div class="playlist-summary-row">
+        <span id="playlist-selected-count">0 selected</span>
+        <span id="playlist-duration-sum" class="meta-badge font-mono">⏱️ 0:00 Total</span>
+      </div>
+
+      <div class="playlist-items-list" id="playlist-items-list"></div>
+
+      <div class="modal-footer">
+        <button id="btn-cancel-playlist" class="secondary-btn">Cancel</button>
+        <button id="btn-start-batch-download" class="download-action-btn-inline">Start Batch Download</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
