@@ -240,7 +240,11 @@ class DownloadManager extends events.EventEmitter {
 
     // Format & Quality Selection Logic
     if (downloadType === "audio-only") {
-      const audioExt = outputFormat || "mp3";
+      let audioExt = (outputFormat || "mp3").toLowerCase();
+      const validAudioFormats = ["mp3", "m4a", "aac", "opus", "flac", "wav", "alac", "vorbis"];
+      if (!validAudioFormats.includes(audioExt)) {
+        audioExt = "mp3";
+      }
       args.push("-x", "--audio-format", audioExt);
       if (audioFormatId) {
         args.push("-f", audioFormatId);

@@ -8,8 +8,11 @@ const __dirname = path.dirname(__filename);
 
 let activeServerPort = 5000;
 
+let serverModuleRef = null;
+
 // Dynamically import ES Module server cleanly
 import("./server/server.js").then((serverModule) => {
+  serverModuleRef = serverModule;
   if (serverModule && typeof serverModule.getActivePort === "function") {
     activeServerPort = serverModule.getActivePort();
   }
@@ -18,6 +21,9 @@ import("./server/server.js").then((serverModule) => {
 });
 
 ipcMain.handle("get-server-port", () => {
+  if (serverModuleRef && typeof serverModuleRef.getActivePort === "function") {
+    return serverModuleRef.getActivePort();
+  }
   return activeServerPort || 5000;
 });
 
@@ -63,8 +69,16 @@ function createWindow() {
     }
   });
 
+  const distPath = path.join(__dirname, "dist", "index.html");
   const uiPath = path.join(__dirname, "ui", "index.html");
-  mainWindow.loadFile(uiPath);
+
+  if (process.env.VITE_DEV_SERVER_URL) {
+    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+  } else if (fs.existsSync(distPath)) {
+    mainWindow.loadFile(distPath);
+  } else {
+    mainWindow.loadFile(uiPath);
+  }
 
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();

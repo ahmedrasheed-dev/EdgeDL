@@ -232,113 +232,133 @@ function getBinaryStats() {
 
 let activeDownloadPromise = null;
 
-async function downloadDirectBinary() {
-  const settings = getSettings();
-  const channel = settings.updateChannel || "nightly";
-  let binaryUrl;
-  if (channel === "nightly") {
-    binaryUrl = IS_WINDOWS
-      ? "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp.exe"
-      : "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp";
-  } else {
-    binaryUrl = IS_WINDOWS
-      ? "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-      : "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
-  }
-
-  const tempPath = BIN_PATH + ".tmp";
-
-  binaryState.status = "downloading";
-  binaryState.progress = 5;
-  binaryState.speed = "Connecting...";
-  binaryState.error = null;
-  broadcastBinaryProgress(binaryState);
-
-  console.log(`[EdgeDL Server] Streaming fast binary download from GitHub CDN...`);
-
-  const response = await fetch(binaryUrl, {
-    redirect: "follow",
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) EdgeDL-Standalone/1.4.6"
+function downloadDirectBinary() {
+  return new Promise((resolve, reject) => {
+    const settings = getSettings();
+    const channel = settings.updateChannel || "nightly";
+    let binaryUrl;
+    if (channel === "nightly") {
+      binaryUrl = IS_WINDOWS
+        ? "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp.exe"
+        : "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp";
+    } else {
+      binaryUrl = IS_WINDOWS
+        ? "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+        : "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
     }
-  });
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} downloading binary from GitHub`);
-  }
+    const tempPath = BIN_PATH + ".tmp";
 
-  const contentLength = parseInt(response.headers.get("content-length") || "0", 10);
-  binaryState.totalRaw = contentLength;
-  if (contentLength > 0) {
-    binaryState.totalBytes = formatBytes(contentLength);
-  } else {
-    binaryState.totalBytes = "~ 18.2 MB";
-  }
+    binaryState.status = "downloading";
+    binaryState.progress = 5;
+    binaryState.speed = "Connecting...";
+    binaryState.error = null;
+    broadcastBinaryProgress(binaryState);
 
-  const fileStream = fs.createWriteStream(tempPath, { highWaterMark: 1024 * 1024 });
-  const reader = response.body.getReader();
+    console.log(`[EdgeDL Server] Streaming binary download from GitHub CDN...`);
 
-  let downloaded = 0;
-  let prevBytes = 0;
-  let prevTime = Date.now();
-  let lastBroadcast = 0;
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    fileStream.write(Buffer.from(value));
-    downloaded += value.length;
-    binaryState.downloadedRaw = downloaded;
-    binaryState.downloadedBytes = formatBytes(downloaded);
-
-    const now = Date.now();
-    if (now - lastBroadcast >= 60) {
-      const timeDiff = (now - prevTime) / 1000;
-      if (timeDiff >= 0.1) {
-        const bps = (downloaded - prevBytes) / timeDiff;
-        binaryState.speed = (bps / (1024 * 1024)).toFixed(1) + " MB/s";
-        prevBytes = downloaded;
-        prevTime = now;
+    function requestUrl(currentUrl, redirectCount = 0) {
+      if (redirectCount > 10) {
+        return reject(new Error("Too many redirects downloading binary"));
       }
 
-      if (contentLength > 0) {
-        binaryState.progress = Math.min(99, Math.round((downloaded / contentLength) * 100));
-      } else {
-        binaryState.progress = Math.min(95, Math.round((downloaded / (18.2 * 1024 * 1024)) * 100));
-      }
+      const client = currentUrl.startsWith("https") ? https : http;
+      const req = client.get(currentUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) EdgeDL-Standalone/1.4.6",
+          "Accept": "*/*"
+        }
+      }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          return requestUrl(res.headers.location, redirectCount + 1);
+        }
+        if (res.statusCode !== 200) {
+          return reject(new Error(`HTTP ${res.statusCode} downloading binary from GitHub`));
+        }
 
-      lastBroadcast = now;
-      broadcastBinaryProgress(binaryState);
+        const contentLength = parseInt(res.headers["content-length"] || "0", 10);
+        binaryState.totalRaw = contentLength;
+        binaryState.totalBytes = contentLength > 0 ? formatBytes(contentLength) : "~ 18.2 MB";
+
+        const fileStream = fs.createWriteStream(tempPath, { highWaterMark: 1024 * 1024 });
+
+        let downloaded = 0;
+        let prevBytes = 0;
+        let prevTime = Date.now();
+        let lastBroadcast = 0;
+
+        res.on("data", (chunk) => {
+          downloaded += chunk.length;
+          fileStream.write(chunk);
+
+          binaryState.downloadedRaw = downloaded;
+          binaryState.downloadedBytes = formatBytes(downloaded);
+
+          const now = Date.now();
+          if (now - lastBroadcast >= 80) {
+            const timeDiff = (now - prevTime) / 1000;
+            if (timeDiff >= 0.2) {
+              const bps = (downloaded - prevBytes) / timeDiff;
+              binaryState.speed = (bps / (1024 * 1024)).toFixed(1) + " MB/s";
+              prevBytes = downloaded;
+              prevTime = now;
+            }
+
+            if (contentLength > 0) {
+              binaryState.progress = Math.min(99, Math.round((downloaded / contentLength) * 100));
+            } else {
+              binaryState.progress = Math.min(95, Math.round((downloaded / (18.2 * 1024 * 1024)) * 100));
+            }
+
+            lastBroadcast = now;
+            broadcastBinaryProgress(binaryState);
+          }
+        });
+
+        res.on("end", () => {
+          fileStream.end(() => {
+            if (fs.existsSync(BIN_PATH)) {
+              try { fs.unlinkSync(BIN_PATH); } catch (_) {}
+            }
+            try {
+              fs.renameSync(tempPath, BIN_PATH);
+              if (!IS_WINDOWS) try { fs.chmodSync(BIN_PATH, 0o755); } catch (_) {}
+            } catch (err) {
+              return reject(err);
+            }
+
+            binaryState.status = "completed";
+            binaryState.progress = 100;
+            binaryState.speed = "Ready";
+            binaryState.downloadedBytes = formatBytes(downloaded);
+            binaryState.totalBytes = formatBytes(downloaded);
+            binaryState.needsUpdate = false;
+            binaryState.lastUpdated = new Date().toISOString();
+            binaryState.ageHours = 0;
+            binaryState.error = null;
+
+            broadcastBinaryProgress(binaryState);
+            console.log(`[EdgeDL Server] High-speed binary download completed at ${BIN_PATH}`);
+            resolve(BIN_PATH);
+          });
+        });
+
+        res.on("error", (err) => {
+          fileStream.close();
+          reject(err);
+        });
+
+        fileStream.on("error", (err) => {
+          fileStream.close();
+          reject(err);
+        });
+      });
+
+      req.on("error", reject);
     }
-  }
 
-  await new Promise((res, rej) => {
-    fileStream.end(() => res());
-    fileStream.on("error", rej);
+    requestUrl(binaryUrl);
   });
-
-  if (fs.existsSync(BIN_PATH)) {
-    try { fs.unlinkSync(BIN_PATH); } catch (_) {}
-  }
-  fs.renameSync(tempPath, BIN_PATH);
-  if (!IS_WINDOWS) {
-    try { fs.chmodSync(BIN_PATH, 0o755); } catch (_) {}
-  }
-
-  binaryState.status = "completed";
-  binaryState.progress = 100;
-  binaryState.speed = "Ready";
-  binaryState.downloadedBytes = formatBytes(downloaded);
-  binaryState.totalBytes = formatBytes(downloaded);
-  binaryState.needsUpdate = false;
-  binaryState.lastUpdated = new Date().toISOString();
-  binaryState.ageHours = 0;
-  binaryState.error = null;
-
-  broadcastBinaryProgress(binaryState);
-  console.log(`[EdgeDL Server] High-speed binary download completed at ${BIN_PATH}`);
-  return BIN_PATH;
 }
 
 function downloadYtDlpBinary(force = false) {
@@ -511,23 +531,30 @@ app.get("/api/binary/startup-check", async (req, res) => {
         console.warn("[EdgeDL Server] Startup binary update background error:", e.message);
       });
     } else {
-      binaryState.status = "up-to-date";
+      binaryState.status = "completed";
       binaryState.progress = 100;
-      binaryState.speed = "Up to date";
+      binaryState.speed = "Ready";
     }
+
+    const statusObj = {
+      ...binaryState,
+      ffmpeg: ffmpegInfo,
+      ytDlp: {
+        exists: stats.exists,
+        version: ytDlpVersion || "nightly",
+        lastUpdated: stats.lastUpdated,
+        ageHours: stats.ageHours,
+        needsUpdate
+      }
+    };
 
     res.json({
       success: true,
       needsUpdate,
       ffmpeg: ffmpegInfo,
-      ytDlp: {
-        exists: stats.exists,
-        version: ytDlpVersion,
-        lastUpdated: stats.lastUpdated,
-        ageHours: stats.ageHours,
-        needsUpdate
-      },
-      state: binaryState
+      ytDlp: statusObj.ytDlp,
+      state: statusObj,
+      status: statusObj
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -640,12 +667,44 @@ app.post("/api/config/port", (req, res) => {
   }, 100);
 });
 
-// Media Analysis Endpoint (Supports Single Media & Playlists)
-app.get("/api/extract", async (req, res) => {
-  const videoUrl = req.query.url;
+// In-memory cache for extracted URLs (5-minute TTL)
+const extractCache = new Map();
+const EXTRACT_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function getCachedExtraction(url, mode) {
+  if (!url) return null;
+  const key = `${url.trim()}_${mode || 'all'}`;
+  const entry = extractCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > EXTRACT_CACHE_TTL_MS) {
+    extractCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCachedExtraction(url, mode, data) {
+  if (!url || !data) return;
+  const key = `${url.trim()}_${mode || 'all'}`;
+  extractCache.set(key, {
+    timestamp: Date.now(),
+    data
+  });
+}
+
+// Media Analysis Endpoint (Supports Single Media & Playlists via GET & POST with 5m Memory Cache)
+app.all("/api/extract", async (req, res) => {
+  const videoUrl = req.body?.url || req.query.url;
+  const mode = req.body?.mode || req.query.mode || "all";
 
   if (!videoUrl) {
-    return res.status(400).json({ success: false, error: "Missing 'url' query parameter" });
+    return res.status(400).json({ success: false, error: "Missing 'url' parameter" });
+  }
+
+  const cached = getCachedExtraction(videoUrl, mode);
+  if (cached) {
+    console.log(`[EdgeDL Server ⚡ Cache Hit]: Instant response for ${videoUrl}`);
+    return res.json(cached);
   }
 
   try {
@@ -673,7 +732,7 @@ app.get("/api/extract", async (req, res) => {
           thumbnail: e.thumbnail || (Array.isArray(e.thumbnails) ? e.thumbnails[0]?.url : null)
         }));
 
-        return res.json({
+        const playlistPayload = {
           success: true,
           data: {
             isPlaylist: true,
@@ -682,7 +741,9 @@ app.get("/api/extract", async (req, res) => {
             entriesCount: entries.length,
             entries
           }
-        });
+        };
+        setCachedExtraction(videoUrl, mode, playlistPayload);
+        return res.json(playlistPayload);
       }
     }
 
@@ -740,7 +801,7 @@ app.get("/api/extract", async (req, res) => {
     videoStreams.sort((a, b) => (b.height || 0) - (a.height || 0));
     audioStreams.sort((a, b) => (b.abr || 0) - (a.abr || 0));
 
-    res.json({
+    const singlePayload = {
       success: true,
       data: {
         isPlaylist: false,
@@ -750,11 +811,15 @@ app.get("/api/extract", async (req, res) => {
         thumbnail: info.thumbnail,
         duration: info.duration,
         uploader: info.uploader,
+        url: info.webpage_url || videoUrl,
         webpageUrl: info.webpage_url || videoUrl,
+        webpage_url: info.webpage_url || videoUrl,
         videoStreams,
         audioStreams
       }
-    });
+    };
+    setCachedExtraction(videoUrl, mode, singlePayload);
+    res.json(singlePayload);
   } catch (err) {
     console.error(`[EdgeDL Server] Extract Error:`, err.message);
     let friendlyErr = err.message || "Failed to extract media information";
@@ -777,8 +842,9 @@ app.get("/api/extract", async (req, res) => {
 
 // Save Thumbnail Endpoint
 app.post("/api/download/thumbnail", async (req, res) => {
-  const { url, title, outputDir } = req.body;
-  if (!url) return res.status(400).json({ success: false, error: "Missing thumbnail URL." });
+  const targetUrl = req.body.url || req.body.thumbnailUrl || req.body.thumbnail;
+  const { title, outputDir } = req.body;
+  if (!targetUrl) return res.status(400).json({ success: false, error: "Missing thumbnail URL." });
 
   try {
     const finalDir = outputDir || path.join(process.env.USERPROFILE || process.env.HOME || ".", "Downloads", "EdgeDL");
@@ -787,7 +853,7 @@ app.post("/api/download/thumbnail", async (req, res) => {
     const safeTitle = sanitizeFolderName(title || "thumbnail");
     const filePath = path.join(finalDir, `${safeTitle}_thumbnail.jpg`);
 
-    await downloadImageWithHeaders(url, filePath);
+    await downloadImageWithHeaders(targetUrl, filePath);
     res.json({ success: true, filePath });
   } catch (err) {
     console.error("[EdgeDL Server] Thumbnail Download Error:", err.message);
