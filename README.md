@@ -1,119 +1,71 @@
-# EdgeDL
+# EdgeDL — Standalone Desktop Downloader
 
 🌐 **Website**: [https://ahmedrasheed-dev.github.io/EdgeDL/](https://ahmedrasheed-dev.github.io/EdgeDL/)
 
-High-performance video downloader and media merger for Chrome and Windows.
+High-performance, standalone desktop video & audio downloader and media engine for Windows.
 
-EdgeDL consists of two parts:
-1. **EdgeDL Chrome Extension** — A clean browser popup interface to detect, select, and download online videos, or merge local video and audio files directly in your browser.
-2. **EdgeDL Companion App** — A lightweight Windows background app powered by `yt-dlp` that handles stream extraction for high-resolution videos (4K, 2K, 1080p).
+**EdgeDL** is a 100% native desktop application built with **Electron**, **Node.js**, **yt-dlp (Nightly Build Channel)**, and **FFmpeg**. It operates completely independently as a standalone desktop application.
 
 ---
 
-## 🛠️ Tech Stack
+## ⚡ Features
 
-Built with modern frontend standards, client-side WebAssembly, and native desktop integration:
-
-### 🧩 Browser Extension (`/edge-dl-ext`)
-- **UI & Logic**: React 19, TypeScript, Tailwind CSS v4
-- **Extension Framework**: WXT (Web Extension Tools) — Chrome Manifest V3 compliant
-- **In-Browser Processing**: FFmpeg WebAssembly (`@ffmpeg/ffmpeg`) for client-side audio/video muxing without external servers
-
-### 🖥️ Desktop Companion App (`/desktop-app`)
-- **Runtime & Desktop Layer**: Electron, Node.js
-- **Local API Server**: Express.js (CORS-enabled REST API for Extension-to-Desktop communication)
-- **Video Extraction Engine**: `yt-dlp` integration for high-resolution (4K / 2K / 1080p) stream extraction
-- **Installer & Distribution**: Electron Builder (NSIS Windows Installer & Portable builds)
-
-### 🏛️ Architecture & Engineering Highlights
-- **Hybrid Desktop/Web Architecture**: Offline-first WebAssembly worker threads for local file muxing paired with native desktop background service for network stream fetching.
-- **Privacy & Performance**: 100% client-side execution — zero media data or user analytics sent to remote servers.
-- **Modern Standards**: Fully typed with TypeScript and compliant with Chrome Extension Manifest V3 specifications.
+- **100% Standalone Desktop Application**: Full native UI with modern theme selector, real-time download progress, system tray integration, and desktop notifications. No browser extensions required.
+- **YouTube Anti-Bot & SABR Bypass Engine**: Solves YouTube EJS challenges using Node.js (`--js-runtimes node`) and optimized player client fallbacks (`web_embedded`, `android`) to bypass HTTP 403 / 429 sign-in prompts.
+- **Smart Audio Language Selection**: Automatically prioritizes English and original native audio tracks (`--format-sort "lang:en,quality,res,fps"`), preventing unwanted foreign language dubs.
+- **Deduplicated Quality Options**: Single clean resolution selection dropdowns (1080p, 720p, 480p, 360p, 2K, 4K, 8K) with automatic `bestaudio` pairing.
+- **Browser Cookies Integration**: Live cookie extraction from Chrome, Edge, Firefox, Brave, Opera, Vivaldi, or custom `cookies.txt` to download 1080p+, age-restricted, and private media.
+- **yt-dlp Nightly Auto-Updates**: Streams the latest `yt-dlp` nightly builds directly from GitHub CDN with automatic health checks.
+- **Playlist & Batch Downloader**: Extract full YouTube playlists and channels, search videos, select custom subsets (All, Top 5, Top 10), and auto-create playlist subfolders.
+- **Video Trimmer & Clip Extractor**: Trim specific video timestamps directly without re-encoding.
+- **Subtitles & Cover Image Saver**: Extract subtitles (.srt or embedded) and HD video thumbnails.
 
 ---
 
-## Features
+## 🛠️ Quick Start
 
-- **High Resolution Downloads**: Extract 4K, 2K, 1080p, and 60fps video streams from YouTube and other video platforms.
-- **One-Click Tab Detection**: Grab video URLs directly from your active browser tab.
-- **Local File Merger**: Combine separate video and audio tracks into MP4, WebM, MKV, or GIF formats.
-- **Client-Side Processing**: Media muxing and stream downloading happen locally on your PC via client-side WebAssembly — zero data sent to external servers.
-- **Standalone Desktop Companion**: Bundled installer with everything pre-configured.
-
----
-
-## Installation
-
-### Option 1: Quick Install (Recommended)
-
-1. Download the latest release files from **[Releases](https://github.com/ahmedrasheed-dev/EdgeDL/releases)**:
-   - **`EdgeDL Companion Setup 1.0.0.exe`** (Desktop Companion App)
-   - **`edge-dl-extension.zip`** (Chrome Extension)
-2. Run **`EdgeDL Companion Setup 1.0.0.exe`** to install the Windows companion app.
-3. Extract **`edge-dl-extension.zip`** to a folder on your PC.
-4. Load the Extension in Google Chrome:
-   - Go to `chrome://extensions` in your browser.
-   - Enable **Developer mode** (toggle switch in the top right corner).
-   - Click **Load unpacked** and select the extracted extension folder.
-
----
-
-### Option 2: Build from Source
-
-#### Prerequisites
-- Node.js (v18 or higher)
-- npm
-
-#### 1. Build the Chrome Extension
 ```bash
-cd edge-dl-ext
 npm install
-npm run build
+npm run dev
 ```
-The compiled extension will be generated in `edge-dl-ext/.output/chrome-mv3`.
 
-#### 2. Build the Desktop Companion App
+### Build Windows Executables (Installer & Portable)
+
 ```bash
-cd desktop-app
-npm install
+# Build setup installer (.exe)
 npm run build
+
+# Build portable executable (.exe)
+npm run build:portable
+
+# Build both installer and portable
+npm run build:all
 ```
-The installer executable will be created in `desktop-app/release/`.
 
 ---
 
-## How to Use
-
-### Downloading Web Videos
-1. Open any video page in your browser.
-2. Click the **EdgeDL** extension icon in your toolbar.
-3. Click **⚡ Current Tab** (or paste a video URL manually) and select **Fetch Video Options**.
-4. Choose your preferred video resolution and audio track, then click **Download Video**.
-
-### Merging Local Files
-1. Open the EdgeDL extension popup and switch to the **🎬 Merge Files** tab.
-2. Select your video file (MP4, WebM, MKV, AVI) and audio file (MP3, AAC, M4A, WAV).
-3. Select your desired output format and speed preset.
-4. Click **⚡ Merge Video & Audio** to save the merged output.
-
----
-
-## Project Structure
+## 🏛️ Project Architecture
 
 ```text
-EdgeDL-Extension/
-├── desktop-app/       # Electron companion desktop app (yt-dlp backend engine)
-└── edge-dl-ext/       # WXT + React Manifest V3 browser extension
+desktop-standalone/
+├── main.js                 # Electron main process & IPC window controls
+├── server/
+│   ├── server.js           # Express API server, extractor engine & settings
+│   └── downloadManager.js  # Real-time yt-dlp spawn, format parser & disk monitor
+└── ui/
+    ├── index.html          # Clean responsive app layout
+    ├── app.js              # Frontend UI logic & polling controller
+    └── style.css           # Glassmorphism design system & theme CSS
 ```
 
 ---
 
-## Author
+## 👤 Author
 
 Developed by **[@ahmedrasheed-dev](https://github.com/ahmedrasheed-dev)**
 
 ---
 
-## License
+## 📄 License
 
 This project is licensed under the ISC License.
