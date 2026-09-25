@@ -132,14 +132,51 @@ const binaryState = {
   ffmpeg: { ok: false, version: null }
 };
 
+function getResolvedFfmpegPath() {
+  const binaryName = IS_WINDOWS ? "ffmpeg.exe" : "ffmpeg";
+
+  if (process.env.FFMPEG_PATH && fs.existsSync(process.env.FFMPEG_PATH)) {
+    return process.env.FFMPEG_PATH;
+  }
+
+  if (ffmpegPath) {
+    let cleanPath = ffmpegPath;
+    if (cleanPath.includes("app.asar")) {
+      cleanPath = cleanPath.replace("app.asar", "app.asar.unpacked");
+    }
+    if (fs.existsSync(cleanPath)) {
+      return cleanPath;
+    }
+  }
+
+  if (process.resourcesPath) {
+    const resourcePath = path.join(process.resourcesPath, "ffmpeg-static", binaryName);
+    if (fs.existsSync(resourcePath)) {
+      return resourcePath;
+    }
+    const unpackedPath = path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "ffmpeg-static", binaryName);
+    if (fs.existsSync(unpackedPath)) {
+      return unpackedPath;
+    }
+  }
+
+  const localNodePath = path.join(__dirname, "..", "node_modules", "ffmpeg-static", binaryName);
+  if (fs.existsSync(localNodePath)) {
+    return localNodePath;
+  }
+
+  return ffmpegPath || "ffmpeg";
+}
+
 function checkFfmpegHealth() {
   return new Promise((resolve) => {
-    if (!ffmpegPath) {
-      const info = { ok: false, version: null, error: "ffmpeg-static binary not found" };
+    const resolvedPath = getResolvedFfmpegPath();
+    if (!resolvedPath || (!fs.existsSync(resolvedPath) && resolvedPath !== "ffmpeg")) {
+      const info = { ok: false, version: null, error: `FFmpeg binary not found at ${resolvedPath || 'path'}` };
       binaryState.ffmpeg = info;
       return resolve(info);
     }
-    execFile(ffmpegPath, ["-version"], { windowsHide: true, timeout: 6000 }, (err, stdout) => {
+    execFile(resolvedPath, ["-version"], { windowsHide: true, timeout: 6000 }, (err, stdout) => {
       if (err) {
         const info = { ok: false, version: null, error: err.message };
         binaryState.ffmpeg = info;
@@ -789,7 +826,7 @@ app.post("/api/download/start", async (req, res) => {
       startTime,
       endTime,
       binPath: executable,
-      ffmpegPath
+      ffmpegPath: getResolvedFfmpegPath()
     });
 
     res.json({ success: true, task });
@@ -837,7 +874,7 @@ app.post("/api/download/batch", async (req, res) => {
         subtitleOption,
         thumbnailOption,
         binPath: executable,
-        ffmpegPath
+        ffmpegPath: getResolvedFfmpegPath()
       });
       tasks.push(task);
     } catch (_) {}
